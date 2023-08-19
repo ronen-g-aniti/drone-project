@@ -15,11 +15,12 @@ The problem of writing a program that is capable of producing flyable paths for 
 
 ![The Drone Above the City](Figures/drone-in-city-simulation.png)
 
-Figure 1. The Flying Car Nanodegree Simulator is a tool that simulates numerically and visualizes the flight of an autonomous quadcopter drone as its control system receives the waypoint commands produced by the computer program I develop in this project.
+**Figure 1.** The Flying Car Nanodegree Simulator is a tool that simulates numerically and visualizes the flight of an autonomous quadcopter drone as its control system receives the waypoint commands produced by the computer program I develop in this project.
 
 
+![The Obstacle Space](Figures/the-obstacle-space.png)
 
-Figure 2. The path planning algorithm I develop in this project must be capable of providing the autonomous agent inside of the simulator with waypoint commands that navigate the drone safely through the urban environment without causing the drone to collide with obstacles, like buildings or trees.
+**Figure 2.** The path planning algorithm I develop in this project must be capable of providing the autonomous agent inside of the simulator with waypoint commands that navigate the drone safely through the urban environment without causing the drone to collide with obstacles, like buildings or trees.
 
 For context, the course’s lesson material introduced several path planning algorithms. There were the sampling-based routines, namely, the probabilistic roadmap and the rapidly-exploring random tree, which return a waypoint sequence by traversing a randomly sampled subset of position-orientation combinations or ”states” from the set of all such states available for the drone to fly to inside of the 3D environment. There were the geometry-heavy techniques, like the Voronoi and medial axis methods, which involved discretizing the environment into spatial regions whose boundaries represent safe-to-fly routes and searching that discretization with another computer algorithm to find a waypoint sequence from a start position to a goal position that is both as short as possible and maintains distance from obstacles. Finally, there was the potential field technique, a more math-intensive technique that involves directing the drone’s motion according to the output of a vector-valued function that models the interaction between attractive forces that pull the drone towards goal locations and repulsive forces that push the drone away from obstacles. 
 
