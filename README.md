@@ -13,7 +13,7 @@ The topic of path planning, which itself is a subtopic of the more general notio
 ## The Problem
 The problem of writing a program that is capable of producing flyable paths for the simulated quadcopter to follow through the 3D virtual environment of the San Francisco city block is the problem that Udacity is requesting that I solve. Udacity is providing starter code that establishes a connection with the drone simulator and establishes a framework that can be extended to enable the drone to listen to and respond to events that occur inside of the simulation environment, such as the drone receiving new measurement readings from its onboard sensors or the drone nearing within a certain threshold distance of a target waypoint. Udacity is also providing a data file that contains the positions and dimensions of the obstacles of the virtual city block, with obstacles being discretized in such a way that each is represented as the union of one or more 3D boxes with, for the most part, a length and width of 10 meters and a height that varies from three meters for the shortest tree located on the city block’s northeast foliage to 212 meters for the block’s tallest building.
 
-
+![The Drone Above the City](Figures/drone-in-city-simulation.png)
 
 Figure 1. The Flying Car Nanodegree Simulator is a tool that simulates numerically and visualizes the flight of an autonomous quadcopter drone as its control system receives the waypoint commands produced by the computer program I develop in this project.
 
