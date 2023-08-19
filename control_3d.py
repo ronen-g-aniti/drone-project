@@ -1,10 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pdb
+from scipy.spatial import KDTree
+import heapq
 
 class Drone:
 	def __init__(self):
-		
+
 		# Constants and properties
 		self.i_x = 0.01
 		self.i_y = 0.01
@@ -35,7 +37,6 @@ class Drone:
 		self.p_dot = 0
 		self.q_dot = 0
 		self.r_dot = 0
-
 		self.x_ddot = 0
 		self.y_ddot = 0
 		self.z_ddot = 0 
@@ -46,8 +47,6 @@ class Drone:
 		self.omega_3 = 0.
 		self.omega_4 = 0.
 		
-
-
 		# Motor configuration
 		#
 		#   #1      #2
@@ -97,15 +96,17 @@ class Drone:
 	@property
 	def state(self):
 		return np.array([self.x, self.y, self.z, self.x_dot, self.y_dot, self.z_dot, self.phi, self.theta, self.psi, self.p, self.q, self.r])
+	
 	@property
 	def collective_force(self):
 		return self.k_f * (self.omega[0]**2 + self.omega[1]**2 + self.omega[2]**2 + self.omega[3]**2)
+	
 	def set_motor_speeds(self, F, T_x, T_y, T_z):
-		
+		pdb.set_trace()		
 		# Given commanded body-frame force and torques, set the new motor speeds
-		self.p_dot = (T_x - (self.i_z - self.i_y) * self.q * self.r) / self.i_x
-		self.q_dot = (T_y - (self.i_x - self.i_z) * self.p * self.r) / self.i_y
-		self.r_dot = (T_z - (self.i_y - self.i_x) * self.p * self.q) / self.i_z
+		self.p_dot = float((T_x - (self.i_z - self.i_y) * self.q * self.r) / self.i_x)
+		self.q_dot = float((T_y - (self.i_x - self.i_z) * self.p * self.r) / self.i_y)
+		self.r_dot = float((T_z - (self.i_y - self.i_x) * self.p * self.q) / self.i_z)
 
 		# The matrix that defines how the motor speeds are related to the commanded force and torques 
 		transformation_matrix = np.array([
@@ -116,6 +117,7 @@ class Drone:
 			])
 	
 		commands = np.array([F, T_x, T_y, T_z])
+
 		# Uses matrix algebra to convert those 4 inputs into 4 motor speeds (4 equations and 4 unknowns)
 		omega = np.sqrt(np.linalg.solve(transformation_matrix, commands))
 		self.omega_1 = omega[0]
@@ -151,6 +153,7 @@ class Drone:
 			[0, np.cos(self.phi), -np.sin(self.phi)],
 			[0, np.sin(self.phi)/np.cos(self.theta), np.cos(self.phi)/np.cos(self.theta)]
 			])
+		
 		self.phi_dot, self.theta_dot, self.psi_dot = conversion_matrix @ np.array([self.p, self.q, self.r])
 		
 		# Update euler angles
@@ -161,82 +164,65 @@ class Drone:
 
 class Controller:
 	def __init__(self, drone):
-		self.z_kp = 1.0
-		self.z_kd = 1.0
-		self.x_kp = 1.0
-		self.x_kd = 1.0
-		self.y_kp = 1.0
-		self.y_kd = 1.0
-		self.phi_kp = 1.0
-		self.theta_kp = 1.0
-		self.psi_kp = 1.0
-		self.p_kp = 1.0
-		self.q_kp = 1.0
-		self.r_kp = 1.0
 		self.g = 9.81
 		self.drone = drone
 
 	def subcontroller_1(self, zt, zt_dot):
 		kp = 1.0
 		kd = 1.0
-		z_ddot_ff = 0
-
+		z_ddot_ff = 9.81
 		F = kp * (zt - self.drone.z) + kd * (zt_dot - self.drone.z_dot) + z_ddot_ff
-
-		return F
+		return -1.0 * F
 
 
 	def subcontroller_2(self, xt, xt_dot, yt, yt_dot):
 		# Produces R_13c and R_23c based on the PD equation given the input trajectory and measured state variables
-
-		kpx = 1.0
-		kdx = 1.0
-		kpy = 1.0
-		kdy = 1.0
-
+		kpx = 2.0
+		kdx = 2.0
+		kpy = 2.0
+		kdy = 2.0
 		R_13c = kpx * (xt - self.drone.x) + kdx * (xt_dot - self.drone.x_dot)
 		R_23c = kpy * (yt - self.drone.y) + kdy * (yt_dot - self.drone.y_dot)
-
 		return R_13c, R_23c
 
 	def subcontroller_3(self, R_13c, R_23c):
 		# produces a p_c and a q_c from a P equation
-
-		kpp = 1.0
-		kpq = 1.0
+		kpp = 0.01
+		kpq = 0.01
 		R_33a = self.drone.rotation_matrix[2,2]
 		R_21a = self.drone.rotation_matrix[1,0]
 		R_11a = self.drone.rotation_matrix[0,0]
 		R_22a = self.drone.rotation_matrix[1,1]
 		R_12a = self.drone.rotation_matrix[0,1]
+		R_13a = self.drone.rotation_matrix[0,2]
+		R_23a = self.drone.rotation_matrix[1,2]
 
 		# This equation is from the Udacity course material
 		pq_vector = 1 / R_33a * np.array([[R_21a, -R_11a],[R_22a, -R_12a]]) @ np.array([[kpp*(R_13c-R_13a)],[kpq*(R_23c-R_23a)]])
-		p_c, q_c = pq_vector
-
+		p_c, q_c = pq_vector[0][0], pq_vector[1][0]
 		return p_c, q_c
 
 	def subcontroller_4(self, psi_c):
-		kpr = 1.0
-
+		kpr = 0.1
 		r_c = kpr * (psi_c - self.drone.psi)
-
 		return r_c
 
 
 	def subcontroller_5(self, p_c, q_c, r_c):
-		kpp = 1.0
-		kpq = 1.0
-		kpr = 1.0
-
+		kpp = 20.0
+		kpq = 20.0
+		kpr = 20.0
 		T_x = kpp * (p_c - self.drone.p)
 		T_y = kpq * (q_c - self.drone.q)
 		T_z = kpr * (r_c - self.drone.r)
-
 		return T_x, T_y, T_z
 
-from scipy.spatial import KDTree
-import heapq
+############################################
+############################################
+# Generate waypoints #######################
+############################################
+############################################
+pdb.set_trace()
 class RRT:
 	"""This is an implementation of the RRT algorithm. The algorithm is biased such that every 10th sample is the goal state."""
 	def __init__(self, start, goal, obstacles):
@@ -421,6 +407,7 @@ class PotentialField:
 
 	def attractive_vector(self):
 		pass
+
 	def repulsive_vector(self, current):
 		current_x = current[0]
 		current_y = current[1]
@@ -512,20 +499,21 @@ class PotentialField:
 				if np.linalg.norm(current - next_waypoint) < 1:
 					current_index += 1
 
-
-
 			# if after incrementing the current_index is greater than the maximum index, then break out of this loop
 			iteration_num += 1
 		safe_path = np.array(path)
 
 		return safe_path
 
-		
-
-
-
+#####################################################
+#####################################################
+#####################################################
 # Generate a trajectory:
 # 1. Generate an obstacle environment in 3D
+#####################################################
+#####################################################
+#####################################################
+
 hx=5.0
 hy=5.0
 hz=50.0
@@ -540,7 +528,14 @@ x_values = np.random.uniform(xmin, xmax, size=num_obs)
 y_values = np.random.uniform(ymin, ymax, size=num_obs)
 obstacles = np.column_stack((x_values, y_values, np.full(num_obs, hz), np.full(num_obs, hx), np.full(num_obs, hy), np.full(num_obs, hz)))
 
+#####################################################
+#####################################################
+#####################################################
 # 2. Run RRT algorithm with potential field to find waypoints
+#####################################################
+#####################################################
+#####################################################
+
 start = np.array([xmin,ymin,zmin])
 goal = np.array([xmax+10,ymax+10,zmax-10])
 rrt = RRT(start, goal, obstacles)
@@ -558,7 +553,13 @@ ax = fig.add_subplot(111,projection='3d')
 ax.scatter(safe_path[:,0],safe_path[:,1],safe_path[:,2], color='green', s=10)
 ax.scatter(x_values, y_values,hz)
 
+#####################################################
+#####################################################
+#####################################################
 # Plot the obstacles as boxes
+#####################################################
+#####################################################
+#####################################################
 for obstacle in obstacles:
 	x_center, y_center, z_center, x_hw, y_hw, z_hw = obstacle
 	x_corners = [x_center + x_hw, x_center - x_hw]
@@ -580,7 +581,13 @@ for obstacle in obstacles:
 
 plt.show()
 
-# Calculate the straight line distance of the path
+#####################################################
+#####################################################
+#####################################################
+# Code to find a trajectory with a  b low snap
+#####################################################
+#####################################################
+#####################################################
 x = safe_path[:,0]
 y = safe_path[:,1]
 z = safe_path[:,2]
@@ -866,16 +873,20 @@ def time_to_coeffs(given_time, t, coeffs_list):
 	z_position_coeffs = z_coeffs[coeff_start_index:coeff_end_index]
 	z_velocity_coeffs = np.polyder(y_position_coeffs[::-1])
 
-	return x_position_coeffs, y_position_coeffs, x_velocity_coeffs, y_velocity_coeffs, z_position_coeffs, z_velocity_coeffs
+	return x_position_coeffs, y_position_coeffs, z_position_coeffs, x_velocity_coeffs, y_velocity_coeffs, z_velocity_coeffs
 
-x_position_coeffs, y_position_coeffs, x_velocity_coeffs, y_velocity_coeffs, z_position_coeffs, z_velocity_coeffs = time_to_coeffs(2, t, coeffs_list)
+x_position_coeffs, y_position_coeffs, z_position_coeffs,  x_velocity_coeffs, y_velocity_coeffs, z_velocity_coeffs = time_to_coeffs(2, t, coeffs_list)
 
-pdb.set_trace()
 # 3. Run low-snap trajectory algorithm to turn the waypoint sequence into a trajectory
 # 4. Run the control loop, logging the drone's state at each timestep, along with the error in the trajectory variables vs. time.
 # 5. Visualize the results using a 3d scatter or line plot, with the desired trajectory in 
 #    one color and the actual trajectory in another color.
 
+
+
+#####################################################
+#####################################################
+#####################################################
 # Control loop 
 
 # Initialize a drone
@@ -890,6 +901,88 @@ pdb.set_trace()
 
 # Based on the timestep, determine the desired waypoint (x, y, z, x_dot, y_dot, z_dot, psi)
 drone = Drone()
+controller = Controller(drone)
+
+# Logging
+trajectory_x, trajectory_y, trajectory_z, trajectory_psi = [], [], [], []
+trajectory_t = []
+x_desired_history, y_desired_history, z_desired_history, psi_desired_history = [], [], [], []
+f1_history, f2_history, f3_history, f4_history = [], [], [], []
+
+# Time Settings
+dt = 0.01
+total_time = np.max(time_data)
+time_steps = int(total_time / dt)
+
+
+# Simulation
+for time_step in range(time_steps):
+	pdb.set_trace()
+	# Desired state
+	time_value = time_step*dt
+	x_desired = float(np.polyval(time_to_coeffs(time_value, t, coeffs_list)[0][::-1], time_value))
+	y_desired = float(np.polyval(time_to_coeffs(time_value, t, coeffs_list)[1][::-1], time_value))
+	z_desired = float(np.polyval(time_to_coeffs(time_value, t, coeffs_list)[2][::-1], time_value))
+	psi_desired = 0
+	x_dot_desired = float(np.polyval(time_to_coeffs(time_value, t, coeffs_list)[3], time_value))
+	y_dot_desired = float(np.polyval(time_to_coeffs(time_value, t, coeffs_list)[4], time_value))
+	z_dot_desired = float(np.polyval(time_to_coeffs(time_value, t, coeffs_list)[5], time_value))
+	x_desired_history.append(x_desired)
+	y_desired_history.append(y_desired)
+	z_desired_history.append(z_desired)
+	psi_desired_history.append(psi_desired)
+
+
+	F = controller.subcontroller_1(z_desired, z_dot_desired)
+	R_13c, R_23c = controller.subcontroller_2(x_desired, x_dot_desired, y_desired, y_dot_desired)
+	p_c, q_c = controller.subcontroller_3(R_13c, R_23c)
+	r_c = controller.subcontroller_4(psi_desired)
+	T_x, T_y, T_z = controller.subcontroller_5(p_c, q_c, r_c)
+	drone.set_motor_speeds(F, T_x, T_y, T_z)
+	
+	trajectory_t.append(time_step)
+	trajectory_x.append(drone.state[0])
+	trajectory_y.append(drone.state[1])
+	trajectory_z.append(drone.state[2])
+	trajectory_psi.append(drone.state[8])
+
+fig = plt.figure()
+ax = fig.add_subplot(111,projection='3d')
+ax.plot(trajectory_x, trajectory_y, trajectory_z)
+ax.plot(x_desired_history, y_desired_history, z_desired_history)
+plt.show()
+plt.subplot(4,4,1)
+plt.plot(trajectory_t, trajectory_x)
+plt.plot(trajectory_t, x_desired_history)
+plt.subplot(4,4,2)
+plt.plot(trajectory_t, trajectory_y)
+plt.plot(trajectory_t, y_desired_history)
+plt.subplot(4,4,3)
+plt.plot(trajectory_t, trajectory_z)
+plt.plot(trajectory_t, z_desired_history)
+plt.subplot(4,4,4)
+plt.plot(trajectory_t, trajectory_psi)
+plt.plot(trajectory_t, psi_desired_history)
+plt.tight_layout()
+plt.show()
+pdb.set_trace()
+
+#####################################################
+#####################################################
+#####################################################
+#####################################################
+#####################################################
+#####################################################
+
+
+
+
+
+
+
+
+
+
 
 omega_history=[]
 state_history=[]
