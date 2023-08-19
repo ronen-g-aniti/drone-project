@@ -29,3 +29,5 @@ I had work cut out for me. It would be up to me to get comfortable enough with t
 Two principles that I’ve come to value as a result of being a tutor guide my work: 1. It’s important to develop an understanding of foundational concepts when entering a new line of study and 2. It’s important to challenge one’s skills on a regular basis. 
 
 ![Frame Transformation](Figures/frame-transformation.gif)
+
+![Composite Rotation](Figures/composite-rotation.gif)
